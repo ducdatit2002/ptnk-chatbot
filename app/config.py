@@ -45,6 +45,7 @@ class Settings:
     project_root: Path
     data_dir: Path
     chat_history_db_path: Path
+    runtime_urls_path: Path
     openai_api_key: str
     openai_chat_model: str
     openai_embedding_model: str
@@ -76,6 +77,8 @@ class Settings:
     ngrok_domain: str
     streamlit_local_url: str
     streamlit_public_url: str
+    streamlit_host: str
+    streamlit_port: int
 
     @property
     def supported_extensions(self) -> tuple[str, ...]:
@@ -98,6 +101,9 @@ def get_settings() -> Settings:
         data_dir=Path(os.getenv("DATA_DIR", str(project_root / "data"))).expanduser(),
         chat_history_db_path=Path(
             os.getenv("CHAT_HISTORY_DB_PATH", str(project_root / "storage" / "chat_history.db"))
+        ).expanduser(),
+        runtime_urls_path=Path(
+            os.getenv("RUNTIME_URLS_PATH", str(project_root / "storage" / "runtime_urls.json"))
         ).expanduser(),
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         openai_chat_model=os.getenv("OPENAI_CHAT_MODEL", "gpt-5.2").strip(),
@@ -146,4 +152,6 @@ def get_settings() -> Settings:
         ngrok_domain=os.getenv("NGROK_DOMAIN", "").strip(),
         streamlit_local_url=os.getenv("STREAMLIT_LOCAL_URL", "http://127.0.0.1:8501").strip(),
         streamlit_public_url=os.getenv("STREAMLIT_PUBLIC_URL", "").strip(),
+        streamlit_host=os.getenv("STREAMLIT_HOST", "127.0.0.1").strip(),
+        streamlit_port=_int_env("STREAMLIT_PORT", 8501),
     )

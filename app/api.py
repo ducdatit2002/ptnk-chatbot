@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
@@ -36,6 +38,19 @@ app.add_middleware(
 )
 
 
+def _load_runtime_urls() -> dict[str, str]:
+    path = settings.runtime_urls_path
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return {str(key): str(value) for key, value in payload.items() if value}
+
+
 @app.get("/health", response_model=HealthResponse)
 def health_check() -> HealthResponse:
     missing = settings.missing_required_settings()
@@ -54,7 +69,12 @@ def health_check() -> HealthResponse:
 
 @app.get("/streamlit", include_in_schema=False)
 def open_streamlit() -> RedirectResponse:
-    target_url = settings.streamlit_public_url or settings.streamlit_local_url
+    runtime_urls = _load_runtime_urls()
+    target_url = (
+        runtime_urls.get("streamlit_public_url")
+        or settings.streamlit_public_url
+        or settings.streamlit_local_url
+    )
     return RedirectResponse(url=target_url, status_code=307)
 
 

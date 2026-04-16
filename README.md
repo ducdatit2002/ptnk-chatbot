@@ -102,6 +102,9 @@ NGROK_DOMAIN=film-stranger-algorithm.ngrok-free.dev
 PUBLIC_BASE_URL=https://film-stranger-algorithm.ngrok-free.dev
 STREAMLIT_LOCAL_URL=http://127.0.0.1:8501
 STREAMLIT_PUBLIC_URL=
+STREAMLIT_HOST=127.0.0.1
+STREAMLIT_PORT=8501
+RUNTIME_URLS_PATH=storage/runtime_urls.json
 ```
 
 Ý nghĩa:
@@ -117,6 +120,8 @@ STREAMLIT_PUBLIC_URL=
 - `PUBLIC_BASE_URL`: public URL de dung cho Messenger webhook hoac test tu ben ngoai.
 - `STREAMLIT_LOCAL_URL`: link Streamlit local.
 - `STREAMLIT_PUBLIC_URL`: link Streamlit public neu ban co public rieng.
+- `STREAMLIT_HOST`, `STREAMLIT_PORT`: host/port chay Streamlit local.
+- `RUNTIME_URLS_PATH`: file runtime luu public URL do script ngrok tao ra.
 
 ## 5. Dữ liệu đầu vào
 
@@ -182,15 +187,20 @@ bash scripts/run_api_ngrok.sh
 Script sẽ:
 
 - chạy FastAPI ở `127.0.0.1:8000`
-- mở tunnel ngrok với domain trong `.env`
+- chạy Streamlit ở `127.0.0.1:8501`
+- mở 2 tunnel ngrok:
+  - API: dùng domain co dinh trong `.env`
+  - Streamlit: public URL rieng qua ngrok
 - in ra public URL, ví dụ:
 
 ```text
 API public:  https://film-stranger-algorithm.ngrok-free.dev
 Swagger:     https://film-stranger-algorithm.ngrok-free.dev/docs
+Streamlit public: https://xxxx.ngrok-free.app
+Redirect route:   https://film-stranger-algorithm.ngrok-free.dev/streamlit
 ```
 
-Link này có thể dùng để cấu hình webhook Messenger.
+Link API co the dung de cau hinh webhook Messenger.
 
 FastAPI cũng có route redirect:
 
@@ -198,10 +208,7 @@ FastAPI cũng có route redirect:
 https://film-stranger-algorithm.ngrok-free.dev/streamlit
 ```
 
-Route này sẽ redirect sang:
-
-- `STREAMLIT_PUBLIC_URL` neu ban da set
-- neu chua set thi redirect sang `STREAMLIT_LOCAL_URL`
+Route nay se redirect sang public URL cua Streamlit do script ngrok tao ra.
 
 ## 7. Ingest dữ liệu vào Pinecone
 
