@@ -193,19 +193,23 @@ if [[ -z "$STREAMLIT_PUBLIC_URL_RUNTIME" ]]; then
 fi
 
 if [[ "$API_PUBLIC_URL" == "$STREAMLIT_PUBLIC_URL_RUNTIME" ]]; then
-  echo "ngrok dang tra ve cung mot public URL cho API va Streamlit. Dung script de tranh route sai."
-  echo "API tunnel:"
-  curl -fsS "http://${API_NGROK_WEB_ADDR}/api/tunnels" || true
-  echo ""
-  echo "Streamlit tunnel:"
-  curl -fsS "http://${STREAMLIT_NGROK_WEB_ADDR}/api/tunnels" || true
-  exit 1
+  if [[ -n "$STREAMLIT_NGROK_URL" ]]; then
+    echo "ngrok dang tra ve cung mot public URL cho API va Streamlit du da cau hinh STREAMLIT_PUBLIC_URL."
+    echo "API tunnel:"
+    curl -fsS "http://${API_NGROK_WEB_ADDR}/api/tunnels" || true
+    echo ""
+    echo "Streamlit tunnel:"
+    curl -fsS "http://${STREAMLIT_NGROK_WEB_ADDR}/api/tunnels" || true
+    exit 1
+  fi
+  echo "ngrok free plan chi cap 1 dev domain, nen Streamlit public se bi trung voi API."
+  echo "API van duoc public, con Streamlit se chi mo local tai http://${STREAMLIT_HOST}:${STREAMLIT_PORT}"
+  STREAMLIT_PUBLIC_URL_RUNTIME=""
 fi
 
 cat >"$RUNTIME_URLS_PATH" <<EOF
 {
-  "api_public_url": "${API_PUBLIC_URL}",
-  "streamlit_public_url": "${STREAMLIT_PUBLIC_URL_RUNTIME}"
+  "api_public_url": "${API_PUBLIC_URL}"$(if [[ -n "$STREAMLIT_PUBLIC_URL_RUNTIME" ]]; then printf ',\n  "streamlit_public_url": "%s"' "$STREAMLIT_PUBLIC_URL_RUNTIME"; fi)
 }
 EOF
 
@@ -214,8 +218,12 @@ echo "API local:        http://${API_HOST}:${API_PORT}"
 echo "API public:       ${API_PUBLIC_URL}"
 echo "Swagger public:   ${API_PUBLIC_URL}/docs"
 echo "Streamlit local:  http://${STREAMLIT_HOST}:${STREAMLIT_PORT}"
-echo "Streamlit public: ${STREAMLIT_PUBLIC_URL_RUNTIME}"
-echo "Redirect route:   ${API_PUBLIC_URL}/streamlit"
+if [[ -n "$STREAMLIT_PUBLIC_URL_RUNTIME" ]]; then
+  echo "Streamlit public: ${STREAMLIT_PUBLIC_URL_RUNTIME}"
+  echo "Redirect route:   ${API_PUBLIC_URL}/streamlit"
+else
+  echo "Streamlit public: khong co tren ngrok free plan hien tai"
+fi
 echo ""
 echo "Nhan Ctrl+C de dung API, Streamlit va ngrok."
 
