@@ -4,7 +4,7 @@ import json
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from .config import get_settings
 from .rag_service import AdmissionsRAGService
@@ -67,8 +67,8 @@ def health_check() -> HealthResponse:
     )
 
 
-@app.get("/streamlit", include_in_schema=False)
-def open_streamlit(request: Request) -> RedirectResponse | HTMLResponse:
+@app.get("/streamlit", include_in_schema=False, response_model=None)
+def open_streamlit(request: Request) -> Response:
     runtime_urls = _load_runtime_urls()
     target_url = runtime_urls.get("streamlit_public_url") or settings.streamlit_public_url
     if target_url:
