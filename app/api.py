@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from .config import get_settings
 from .rag_service import AdmissionsRAGService
@@ -49,6 +50,12 @@ def health_check() -> HealthResponse:
         supported_extensions=list(settings.supported_extensions),
         public_base_url=settings.public_base_url or None,
     )
+
+
+@app.get("/streamlit", include_in_schema=False)
+def open_streamlit() -> RedirectResponse:
+    target_url = settings.streamlit_public_url or settings.streamlit_local_url
+    return RedirectResponse(url=target_url, status_code=307)
 
 
 @app.post("/ingest", response_model=IngestResponse)

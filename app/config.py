@@ -74,6 +74,8 @@ class Settings:
     public_base_url: str
     ngrok_authtoken: str
     ngrok_domain: str
+    streamlit_local_url: str
+    streamlit_public_url: str
 
     @property
     def supported_extensions(self) -> tuple[str, ...]:
@@ -142,4 +144,6 @@ def get_settings() -> Settings:
             or os.getenv("NGROK_TOKEN_AUTH", "").strip()
         ),
         ngrok_domain=os.getenv("NGROK_DOMAIN", "").strip(),
+        streamlit_local_url=os.getenv("STREAMLIT_LOCAL_URL", "http://127.0.0.1:8501").strip(),
+        streamlit_public_url=os.getenv("STREAMLIT_PUBLIC_URL", "").strip(),
     )

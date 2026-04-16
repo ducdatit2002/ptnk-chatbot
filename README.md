@@ -100,6 +100,8 @@ API_HOST=127.0.0.1
 API_PORT=8000
 NGROK_DOMAIN=film-stranger-algorithm.ngrok-free.dev
 PUBLIC_BASE_URL=https://film-stranger-algorithm.ngrok-free.dev
+STREAMLIT_LOCAL_URL=http://127.0.0.1:8501
+STREAMLIT_PUBLIC_URL=
 ```
 
 Ý nghĩa:
@@ -113,6 +115,8 @@ PUBLIC_BASE_URL=https://film-stranger-algorithm.ngrok-free.dev
 - `FAST_ANSWER_MAX_CHARS`: giới hạn độ dài cho fast path để câu trả lời vẫn ngắn và gọn.
 - `NGROK_DOMAIN`: domain ngrok co dinh de public API.
 - `PUBLIC_BASE_URL`: public URL de dung cho Messenger webhook hoac test tu ben ngoai.
+- `STREAMLIT_LOCAL_URL`: link Streamlit local.
+- `STREAMLIT_PUBLIC_URL`: link Streamlit public neu ban co public rieng.
 
 ## 5. Dữ liệu đầu vào
 
@@ -187,6 +191,17 @@ Swagger:     https://film-stranger-algorithm.ngrok-free.dev/docs
 ```
 
 Link này có thể dùng để cấu hình webhook Messenger.
+
+FastAPI cũng có route redirect:
+
+```text
+https://film-stranger-algorithm.ngrok-free.dev/streamlit
+```
+
+Route này sẽ redirect sang:
+
+- `STREAMLIT_PUBLIC_URL` neu ban da set
+- neu chua set thi redirect sang `STREAMLIT_LOCAL_URL`
 
 ## 7. Ingest dữ liệu vào Pinecone
 
