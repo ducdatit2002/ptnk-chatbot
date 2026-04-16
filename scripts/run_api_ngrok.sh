@@ -19,9 +19,11 @@ STREAMLIT_PORT="${STREAMLIT_PORT:-8501}"
 NGROK_DOMAIN="${NGROK_DOMAIN:-film-stranger-algorithm.ngrok-free.dev}"
 NGROK_AUTHTOKEN="${NGROK_AUTHTOKEN:-${NGROK_TOKEN_AUTH:-}}"
 RUNTIME_URLS_PATH="${RUNTIME_URLS_PATH:-$PROJECT_ROOT/storage/runtime_urls.json}"
+NGROK_WORKDIR="${NGROK_WORKDIR:-$PROJECT_ROOT/storage/ngrok}"
 STREAMLIT_NGROK_URL="${STREAMLIT_NGROK_URL:-${STREAMLIT_PUBLIC_URL:-}}"
 
 mkdir -p "$(dirname "$RUNTIME_URLS_PATH")"
+mkdir -p "$NGROK_WORKDIR"
 
 if [[ ! -x ".venv/bin/uvicorn" ]]; then
   echo "Khong tim thay .venv/bin/uvicorn. Hay tao venv va cai dependency truoc."
@@ -78,14 +80,14 @@ if ! curl -fsS "http://${STREAMLIT_HOST}:${STREAMLIT_PORT}" >/dev/null 2>&1; the
   exit 1
 fi
 
-NGROK_CONFIG_FILE="$(mktemp /tmp/ptnk-ngrok-config.XXXXXX.yml)"
+NGROK_CONFIG_FILE="$NGROK_WORKDIR/ngrok-agent.yml"
 
 cat >"$NGROK_CONFIG_FILE" <<EOF
 version: 3
 agent:
   authtoken: ${NGROK_AUTHTOKEN}
   web_addr: 127.0.0.1:4040
-  log: /tmp/ptnk-ngrok-agent.log
+  log: ${NGROK_WORKDIR}/agent.log
   console_ui: false
 endpoints:
   - name: api
@@ -110,7 +112,7 @@ EOF
 fi
 
 echo "Dang mo cac tunnel ngrok ..."
-ngrok start --all --config "$NGROK_CONFIG_FILE" >/tmp/ptnk-ngrok.log 2>&1 &
+ngrok start --all --config "$NGROK_CONFIG_FILE" >"${NGROK_WORKDIR}/ngrok.log" 2>&1 &
 NGROK_PID=$!
 
 for _ in {1..30}; do
@@ -122,7 +124,7 @@ done
 
 if ! curl -fsS "http://127.0.0.1:4040/api/tunnels" >/dev/null 2>&1; then
   echo "ngrok khong khoi dong duoc. Xem log:"
-  cat /tmp/ptnk-ngrok.log
+  cat "${NGROK_WORKDIR}/ngrok.log"
   exit 1
 fi
 
@@ -162,7 +164,7 @@ PY
 
 if [[ -z "$API_PUBLIC_URL" ]]; then
   echo "Khong lay duoc public URL cua API tu ngrok."
-  cat /tmp/ptnk-ngrok.log
+  cat "${NGROK_WORKDIR}/ngrok.log"
   exit 1
 fi
 
