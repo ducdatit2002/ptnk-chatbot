@@ -128,42 +128,82 @@ if ! curl -fsS "http://127.0.0.1:4040/api/tunnels" >/dev/null 2>&1; then
   exit 1
 fi
 
-TUNNEL_JSON="$(curl -fsS "http://127.0.0.1:4040/api/tunnels")"
-URLS_JSON="$(python3 - <<'PY' "$TUNNEL_JSON"
+extract_urls() {
+  local tunnel_json="$1"
+  python3 - <<'PY' "$tunnel_json" "$NGROK_DOMAIN" "$API_PORT" "$STREAMLIT_PORT"
 import json
 import sys
 
 payload = json.loads(sys.argv[1])
+ngrok_domain = sys.argv[2].strip()
+api_port = sys.argv[3].strip()
+streamlit_port = sys.argv[4].strip()
 result = {}
 for item in payload.get("tunnels", []):
     name = str(item.get("name", "")).strip()
     public_url = str(item.get("public_url", "")).strip()
-    if name == "api" and public_url:
+    forwards_to = str(item.get("forwards_to", "")).strip()
+    config = item.get("config", {}) or {}
+    addr = str(config.get("addr", "")).strip()
+
+    is_api = False
+    is_streamlit = False
+
+    if ngrok_domain and ngrok_domain in public_url:
+        is_api = True
+    if name == "api":
+        is_api = True
+    if name == "streamlit":
+        is_streamlit = True
+    if api_port and (addr.endswith(f":{api_port}") or forwards_to.endswith(f":{api_port}")):
+        is_api = True
+    if streamlit_port and (addr.endswith(f":{streamlit_port}") or forwards_to.endswith(f":{streamlit_port}")):
+        is_streamlit = True
+
+    if is_api and public_url:
         result["api_public_url"] = public_url
-    if name == "streamlit" and public_url:
+    if is_streamlit and public_url:
         result["streamlit_public_url"] = public_url
 print(json.dumps(result, ensure_ascii=False))
 PY
-)"
+}
 
-API_PUBLIC_URL="$(python3 - <<'PY' "$URLS_JSON"
+URLS_JSON="{}"
+API_PUBLIC_URL=""
+STREAMLIT_PUBLIC_URL_RUNTIME=""
+for _ in {1..20}; do
+  TUNNEL_JSON="$(curl -fsS "http://127.0.0.1:4040/api/tunnels")"
+  URLS_JSON="$(extract_urls "$TUNNEL_JSON")"
+  API_PUBLIC_URL="$(python3 - <<'PY' "$URLS_JSON"
 import json
 import sys
 payload = json.loads(sys.argv[1])
 print(payload.get("api_public_url", ""))
 PY
 )"
-
-STREAMLIT_PUBLIC_URL_RUNTIME="$(python3 - <<'PY' "$URLS_JSON"
+  STREAMLIT_PUBLIC_URL_RUNTIME="$(python3 - <<'PY' "$URLS_JSON"
 import json
 import sys
 payload = json.loads(sys.argv[1])
 print(payload.get("streamlit_public_url", ""))
 PY
 )"
+  if [[ -n "$API_PUBLIC_URL" && -n "$STREAMLIT_PUBLIC_URL_RUNTIME" ]]; then
+    break
+  fi
+  sleep 1
+done
 
 if [[ -z "$API_PUBLIC_URL" ]]; then
   echo "Khong lay duoc public URL cua API tu ngrok."
+  echo "Tunnel data: $URLS_JSON"
+  cat "${NGROK_WORKDIR}/ngrok.log"
+  exit 1
+fi
+
+if [[ -z "$STREAMLIT_PUBLIC_URL_RUNTIME" ]]; then
+  echo "Khong lay duoc public URL cua Streamlit tu ngrok."
+  echo "Tunnel data: $URLS_JSON"
   cat "${NGROK_WORKDIR}/ngrok.log"
   exit 1
 fi

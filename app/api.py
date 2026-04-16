@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .config import get_settings
 from .rag_service import AdmissionsRAGService
@@ -68,14 +68,24 @@ def health_check() -> HealthResponse:
 
 
 @app.get("/streamlit", include_in_schema=False)
-def open_streamlit() -> RedirectResponse:
+def open_streamlit(request: Request) -> RedirectResponse | HTMLResponse:
     runtime_urls = _load_runtime_urls()
-    target_url = (
-        runtime_urls.get("streamlit_public_url")
-        or settings.streamlit_public_url
-        or settings.streamlit_local_url
+    target_url = runtime_urls.get("streamlit_public_url") or settings.streamlit_public_url
+    if target_url:
+        return RedirectResponse(url=target_url, status_code=307)
+
+    if request.url.hostname in {"127.0.0.1", "localhost"} and settings.streamlit_local_url:
+        return RedirectResponse(url=settings.streamlit_local_url, status_code=307)
+
+    return HTMLResponse(
+        content=(
+            "<html><body>"
+            "<h3>Streamlit public URL chua san sang</h3>"
+            "<p>Hay chay lai <code>bash scripts/run_api_ngrok.sh</code> de mo tunnel cho Streamlit.</p>"
+            "</body></html>"
+        ),
+        status_code=503,
     )
-    return RedirectResponse(url=target_url, status_code=307)
 
 
 @app.post("/ingest", response_model=IngestResponse)
