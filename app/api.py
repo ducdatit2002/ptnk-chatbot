@@ -47,6 +47,7 @@ def health_check() -> HealthResponse:
         data_dir=str(settings.data_dir),
         chat_history_db_path=str(settings.chat_history_db_path),
         supported_extensions=list(settings.supported_extensions),
+        public_base_url=settings.public_base_url or None,
     )
 
 

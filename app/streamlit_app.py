@@ -22,6 +22,8 @@ st.set_page_config(
 
 st.title("Chatbot hỏi đáp về Trường Phổ thông Năng khiếu - Đại học Quốc gia TP.HCM")
 st.caption("")
+if settings.public_base_url:
+    st.info(f"Public API URL: {settings.public_base_url}")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []

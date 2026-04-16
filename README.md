@@ -96,6 +96,10 @@ WEB_SEARCH_SCORE_THRESHOLD=0.35
 QUERY_EMBEDDING_CACHE_SIZE=512
 FAST_ANSWER_SCORE_THRESHOLD=0.72
 FAST_ANSWER_MAX_CHARS=420
+API_HOST=127.0.0.1
+API_PORT=8000
+NGROK_DOMAIN=film-stranger-algorithm.ngrok-free.dev
+PUBLIC_BASE_URL=https://film-stranger-algorithm.ngrok-free.dev
 ```
 
 Ý nghĩa:
@@ -107,6 +111,8 @@ FAST_ANSWER_MAX_CHARS=420
 - `QUERY_EMBEDDING_CACHE_SIZE`: số câu hỏi gần nhất được cache embedding để giảm thời gian phản hồi.
 - `FAST_ANSWER_SCORE_THRESHOLD`: nếu top match đủ mạnh, bot sẽ trả lời trực tiếp từ dữ liệu thay vì gọi model.
 - `FAST_ANSWER_MAX_CHARS`: giới hạn độ dài cho fast path để câu trả lời vẫn ngắn và gọn.
+- `NGROK_DOMAIN`: domain ngrok co dinh de public API.
+- `PUBLIC_BASE_URL`: public URL de dung cho Messenger webhook hoac test tu ben ngoai.
 
 ## 5. Dữ liệu đầu vào
 
@@ -160,6 +166,27 @@ Swagger UI:
 ```text
 http://localhost:8000/docs
 ```
+
+## 6.1. Chạy API kèm ngrok
+
+Nếu bạn muốn vừa chạy local vừa public API ra internet bằng ngrok, dùng:
+
+```bash
+bash scripts/run_api_ngrok.sh
+```
+
+Script sẽ:
+
+- chạy FastAPI ở `127.0.0.1:8000`
+- mở tunnel ngrok với domain trong `.env`
+- in ra public URL, ví dụ:
+
+```text
+API public:  https://film-stranger-algorithm.ngrok-free.dev
+Swagger:     https://film-stranger-algorithm.ngrok-free.dev/docs
+```
+
+Link này có thể dùng để cấu hình webhook Messenger.
 
 ## 7. Ingest dữ liệu vào Pinecone
 

@@ -69,6 +69,11 @@ class Settings:
     query_embedding_cache_size: int
     fast_answer_score_threshold: float
     fast_answer_max_chars: int
+    api_host: str
+    api_port: int
+    public_base_url: str
+    ngrok_authtoken: str
+    ngrok_domain: str
 
     @property
     def supported_extensions(self) -> tuple[str, ...]:
@@ -122,4 +127,19 @@ def get_settings() -> Settings:
         query_embedding_cache_size=_int_env("QUERY_EMBEDDING_CACHE_SIZE", 512),
         fast_answer_score_threshold=_float_env("FAST_ANSWER_SCORE_THRESHOLD", 0.72),
         fast_answer_max_chars=_int_env("FAST_ANSWER_MAX_CHARS", 420),
+        api_host=os.getenv("API_HOST", "127.0.0.1").strip(),
+        api_port=_int_env("API_PORT", 8000),
+        public_base_url=(
+            os.getenv("PUBLIC_BASE_URL", "").strip()
+            or (
+                f"https://{os.getenv('NGROK_DOMAIN', '').strip()}"
+                if os.getenv("NGROK_DOMAIN", "").strip()
+                else ""
+            )
+        ),
+        ngrok_authtoken=(
+            os.getenv("NGROK_AUTHTOKEN", "").strip()
+            or os.getenv("NGROK_TOKEN_AUTH", "").strip()
+        ),
+        ngrok_domain=os.getenv("NGROK_DOMAIN", "").strip(),
     )

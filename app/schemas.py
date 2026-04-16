@@ -67,6 +67,7 @@ class HealthResponse(BaseModel):
     data_dir: str
     chat_history_db_path: str
     supported_extensions: list[str]
+    public_base_url: str | None = None
 
 
 class StoredChatMessage(BaseModel):
