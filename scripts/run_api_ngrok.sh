@@ -21,6 +21,8 @@ NGROK_AUTHTOKEN="${NGROK_AUTHTOKEN:-${NGROK_TOKEN_AUTH:-}}"
 RUNTIME_URLS_PATH="${RUNTIME_URLS_PATH:-$PROJECT_ROOT/storage/runtime_urls.json}"
 NGROK_WORKDIR="${NGROK_WORKDIR:-$PROJECT_ROOT/storage/ngrok}"
 STREAMLIT_NGROK_URL="${STREAMLIT_NGROK_URL:-${STREAMLIT_PUBLIC_URL:-}}"
+API_NGROK_WEB_ADDR="${API_NGROK_WEB_ADDR:-127.0.0.1:4040}"
+STREAMLIT_NGROK_WEB_ADDR="${STREAMLIT_NGROK_WEB_ADDR:-127.0.0.1:4041}"
 
 mkdir -p "$(dirname "$RUNTIME_URLS_PATH")"
 mkdir -p "$NGROK_WORKDIR"
@@ -47,9 +49,12 @@ if [[ -z "$NGROK_AUTHTOKEN" ]]; then
 fi
 
 cleanup() {
-  rm -f "$RUNTIME_URLS_PATH" "${NGROK_CONFIG_FILE:-}"
-  if [[ -n "${NGROK_PID:-}" ]] && kill -0 "$NGROK_PID" >/dev/null 2>&1; then
-    kill "$NGROK_PID" >/dev/null 2>&1 || true
+  rm -f "$RUNTIME_URLS_PATH" "${API_NGROK_CONFIG:-}" "${STREAMLIT_NGROK_CONFIG:-}"
+  if [[ -n "${API_NGROK_PID:-}" ]] && kill -0 "$API_NGROK_PID" >/dev/null 2>&1; then
+    kill "$API_NGROK_PID" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${STREAMLIT_NGROK_PID:-}" ]] && kill -0 "$STREAMLIT_NGROK_PID" >/dev/null 2>&1; then
+    kill "$STREAMLIT_NGROK_PID" >/dev/null 2>&1 || true
   fi
   if [[ -n "${STREAMLIT_PID:-}" ]] && kill -0 "$STREAMLIT_PID" >/dev/null 2>&1; then
     kill "$STREAMLIT_PID" >/dev/null 2>&1 || true
@@ -61,6 +66,46 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+wait_for_http() {
+  local url="$1"
+  local attempts="${2:-30}"
+  for _ in $(seq 1 "$attempts"); do
+    if curl -fsS "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+extract_first_https_url() {
+  local api_url="$1"
+  python3 - <<'PY' "$api_url"
+import json
+import sys
+from urllib.request import urlopen
+
+api_url = sys.argv[1]
+with urlopen(api_url) as response:
+    payload = json.load(response)
+
+for item in payload.get("tunnels", []):
+    public_url = str(item.get("public_url", "")).strip()
+    if public_url.startswith("https://"):
+        print(public_url)
+        break
+PY
+}
+
+echo "Dang chay FastAPI tai http://${API_HOST}:${API_PORT} ..."
+".venv/bin/uvicorn" app.api:app --host "$API_HOST" --port "$API_PORT" --reload >/tmp/ptnk-api.log 2>&1 &
+API_PID=$!
+
+if ! wait_for_http "http://${API_HOST}:${API_PORT}/health" 30; then
+  echo "API khong len duoc. Kiem tra log /tmp/ptnk-api.log"
+  exit 1
+fi
+
 echo "Dang chay Streamlit tai http://${STREAMLIT_HOST}:${STREAMLIT_PORT} ..."
 ".venv/bin/streamlit" run app/streamlit_app.py \
   --server.address "$STREAMLIT_HOST" \
@@ -68,170 +113,92 @@ echo "Dang chay Streamlit tai http://${STREAMLIT_HOST}:${STREAMLIT_PORT} ..."
   --server.headless true >/tmp/ptnk-streamlit.log 2>&1 &
 STREAMLIT_PID=$!
 
-for _ in {1..30}; do
-  if curl -fsS "http://${STREAMLIT_HOST}:${STREAMLIT_PORT}" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-done
-
-if ! curl -fsS "http://${STREAMLIT_HOST}:${STREAMLIT_PORT}" >/dev/null 2>&1; then
+if ! wait_for_http "http://${STREAMLIT_HOST}:${STREAMLIT_PORT}" 30; then
   echo "Streamlit khong len duoc. Kiem tra log /tmp/ptnk-streamlit.log"
   exit 1
 fi
 
-NGROK_CONFIG_FILE="$NGROK_WORKDIR/ngrok-agent.yml"
+API_NGROK_CONFIG="$NGROK_WORKDIR/ngrok-api.yml"
+STREAMLIT_NGROK_CONFIG="$NGROK_WORKDIR/ngrok-streamlit.yml"
 
-cat >"$NGROK_CONFIG_FILE" <<EOF
+cat >"$API_NGROK_CONFIG" <<EOF
 version: 3
 agent:
   authtoken: ${NGROK_AUTHTOKEN}
-  web_addr: 127.0.0.1:4040
-  log: ${NGROK_WORKDIR}/agent.log
+  web_addr: ${API_NGROK_WEB_ADDR}
   console_ui: false
-endpoints:
-  - name: api
-    url: https://${NGROK_DOMAIN}
-    upstream:
-      url: http://${API_HOST}:${API_PORT}
 EOF
 
-if [[ -n "$STREAMLIT_NGROK_URL" ]]; then
-  cat >>"$NGROK_CONFIG_FILE" <<EOF
-  - name: streamlit
-    url: ${STREAMLIT_NGROK_URL}
-    upstream:
-      url: http://${STREAMLIT_HOST}:${STREAMLIT_PORT}
+cat >"$STREAMLIT_NGROK_CONFIG" <<EOF
+version: 3
+agent:
+  authtoken: ${NGROK_AUTHTOKEN}
+  web_addr: ${STREAMLIT_NGROK_WEB_ADDR}
+  console_ui: false
 EOF
-else
-  cat >>"$NGROK_CONFIG_FILE" <<EOF
-  - name: streamlit
-    upstream:
-      url: http://${STREAMLIT_HOST}:${STREAMLIT_PORT}
-EOF
-fi
 
 echo "Dang mo cac tunnel ngrok ..."
-ngrok start --all --config "$NGROK_CONFIG_FILE" >"${NGROK_WORKDIR}/ngrok.log" 2>&1 &
-NGROK_PID=$!
+ngrok http "http://${API_HOST}:${API_PORT}" \
+  --url "https://${NGROK_DOMAIN}" \
+  --name api \
+  --config "$API_NGROK_CONFIG" \
+  --log "${NGROK_WORKDIR}/api-ngrok.log" \
+  --log-format logfmt \
+  --log-level info >/dev/null 2>&1 &
+API_NGROK_PID=$!
 
-for _ in {1..30}; do
-  if curl -fsS "http://127.0.0.1:4040/api/tunnels" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-done
+streamlit_ngrok_cmd=(
+  ngrok http "http://${STREAMLIT_HOST}:${STREAMLIT_PORT}"
+  --name streamlit
+  --config "$STREAMLIT_NGROK_CONFIG"
+  --log "${NGROK_WORKDIR}/streamlit-ngrok.log"
+  --log-format logfmt
+  --log-level info
+)
 
-if ! curl -fsS "http://127.0.0.1:4040/api/tunnels" >/dev/null 2>&1; then
-  echo "ngrok khong khoi dong duoc. Xem log:"
-  cat "${NGROK_WORKDIR}/ngrok.log"
+if [[ -n "$STREAMLIT_NGROK_URL" ]]; then
+  streamlit_ngrok_cmd+=(--url "$STREAMLIT_NGROK_URL")
+fi
+
+"${streamlit_ngrok_cmd[@]}" >/dev/null 2>&1 &
+STREAMLIT_NGROK_PID=$!
+
+if ! wait_for_http "http://${API_NGROK_WEB_ADDR}/api/tunnels" 30; then
+  echo "ngrok API tunnel khong khoi dong duoc. Xem log:"
+  cat "${NGROK_WORKDIR}/api-ngrok.log"
   exit 1
 fi
 
-extract_urls() {
-  local tunnel_json="$1"
-  python3 - <<'PY' "$tunnel_json" "$NGROK_DOMAIN" "$API_PORT" "$STREAMLIT_PORT"
-import json
-import sys
+if ! wait_for_http "http://${STREAMLIT_NGROK_WEB_ADDR}/api/tunnels" 30; then
+  echo "ngrok Streamlit tunnel khong khoi dong duoc. Xem log:"
+  cat "${NGROK_WORKDIR}/streamlit-ngrok.log"
+  exit 1
+fi
 
-payload = json.loads(sys.argv[1])
-ngrok_domain = sys.argv[2].strip()
-api_port = sys.argv[3].strip()
-streamlit_port = sys.argv[4].strip()
-tunnels = payload.get("tunnels", [])
-https_urls = []
-api_public_url = ""
-streamlit_public_url = ""
-
-for item in tunnels:
-    public_url = str(item.get("public_url", "")).strip()
-    if public_url.startswith("https://") and public_url not in https_urls:
-        https_urls.append(public_url)
-
-for item in tunnels:
-    name = str(item.get("name", "")).strip()
-    public_url = str(item.get("public_url", "")).strip()
-    forwards_to = str(item.get("forwards_to", "")).strip()
-    config = item.get("config", {}) or {}
-    addr = str(config.get("addr", "")).strip()
-
-    if not public_url:
-        continue
-
-    if not api_public_url:
-        if ngrok_domain and ngrok_domain in public_url:
-            api_public_url = public_url
-        elif name == "api":
-            api_public_url = public_url
-        elif api_port and (addr.endswith(f":{api_port}") or forwards_to.endswith(f":{api_port}")):
-            api_public_url = public_url
-
-    if not streamlit_public_url:
-        if name == "streamlit":
-            streamlit_public_url = public_url
-        elif streamlit_port and (addr.endswith(f":{streamlit_port}") or forwards_to.endswith(f":{streamlit_port}")):
-            streamlit_public_url = public_url
-
-if not api_public_url and https_urls:
-    api_public_url = https_urls[0]
-
-if not streamlit_public_url:
-    for url in https_urls:
-        if url != api_public_url:
-            streamlit_public_url = url
-            break
-
-if streamlit_public_url == api_public_url:
-    streamlit_public_url = ""
-
-result = {
-    "api_public_url": api_public_url,
-    "streamlit_public_url": streamlit_public_url,
-    "https_urls": https_urls,
-}
-print(json.dumps(result, ensure_ascii=False))
-PY
-}
-
-URLS_JSON="{}"
-API_PUBLIC_URL=""
-STREAMLIT_PUBLIC_URL_RUNTIME=""
-for _ in {1..20}; do
-  TUNNEL_JSON="$(curl -fsS "http://127.0.0.1:4040/api/tunnels")"
-  URLS_JSON="$(extract_urls "$TUNNEL_JSON")"
-  API_PUBLIC_URL="$(python3 - <<'PY' "$URLS_JSON"
-import json
-import sys
-payload = json.loads(sys.argv[1])
-print(payload.get("api_public_url", ""))
-PY
-)"
-  STREAMLIT_PUBLIC_URL_RUNTIME="$(python3 - <<'PY' "$URLS_JSON"
-import json
-import sys
-payload = json.loads(sys.argv[1])
-print(payload.get("streamlit_public_url", ""))
-PY
-)"
-  if [[ -n "$API_PUBLIC_URL" && -n "$STREAMLIT_PUBLIC_URL_RUNTIME" ]]; then
-    break
-  fi
-  sleep 1
-done
+API_PUBLIC_URL="$(extract_first_https_url "http://${API_NGROK_WEB_ADDR}/api/tunnels")"
+STREAMLIT_PUBLIC_URL_RUNTIME="$(extract_first_https_url "http://${STREAMLIT_NGROK_WEB_ADDR}/api/tunnels")"
 
 if [[ -z "$API_PUBLIC_URL" ]]; then
   echo "Khong lay duoc public URL cua API tu ngrok."
-  echo "Tunnel data: $URLS_JSON"
-  cat "${NGROK_WORKDIR}/ngrok.log"
+  curl -fsS "http://${API_NGROK_WEB_ADDR}/api/tunnels" || true
+  cat "${NGROK_WORKDIR}/api-ngrok.log"
   exit 1
 fi
 
 if [[ -z "$STREAMLIT_PUBLIC_URL_RUNTIME" ]]; then
   echo "Khong lay duoc public URL cua Streamlit tu ngrok."
-  echo "Tunnel data: $URLS_JSON"
-  echo "Raw tunnels:"
-  curl -fsS "http://127.0.0.1:4040/api/tunnels" || true
-  cat "${NGROK_WORKDIR}/ngrok.log"
+  curl -fsS "http://${STREAMLIT_NGROK_WEB_ADDR}/api/tunnels" || true
+  cat "${NGROK_WORKDIR}/streamlit-ngrok.log"
+  exit 1
+fi
+
+if [[ "$API_PUBLIC_URL" == "$STREAMLIT_PUBLIC_URL_RUNTIME" ]]; then
+  echo "ngrok dang tra ve cung mot public URL cho API va Streamlit. Dung script de tranh route sai."
+  echo "API tunnel:"
+  curl -fsS "http://${API_NGROK_WEB_ADDR}/api/tunnels" || true
+  echo ""
+  echo "Streamlit tunnel:"
+  curl -fsS "http://${STREAMLIT_NGROK_WEB_ADDR}/api/tunnels" || true
   exit 1
 fi
 
@@ -242,34 +209,14 @@ cat >"$RUNTIME_URLS_PATH" <<EOF
 }
 EOF
 
-export PUBLIC_BASE_URL="$API_PUBLIC_URL"
-
-echo "Dang chay FastAPI tai http://${API_HOST}:${API_PORT} ..."
-".venv/bin/uvicorn" app.api:app --host "$API_HOST" --port "$API_PORT" --reload &
-API_PID=$!
-
-for _ in {1..30}; do
-  if curl -fsS "http://${API_HOST}:${API_PORT}/health" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-done
-
-if ! curl -fsS "http://${API_HOST}:${API_PORT}/health" >/dev/null 2>&1; then
-  echo "API khong len duoc. Kiem tra log uvicorn."
-  exit 1
-fi
-
 echo ""
 echo "API local:        http://${API_HOST}:${API_PORT}"
 echo "API public:       ${API_PUBLIC_URL}"
 echo "Swagger public:   ${API_PUBLIC_URL}/docs"
 echo "Streamlit local:  http://${STREAMLIT_HOST}:${STREAMLIT_PORT}"
-if [[ -n "$STREAMLIT_PUBLIC_URL_RUNTIME" ]]; then
-  echo "Streamlit public: ${STREAMLIT_PUBLIC_URL_RUNTIME}"
-fi
+echo "Streamlit public: ${STREAMLIT_PUBLIC_URL_RUNTIME}"
 echo "Redirect route:   ${API_PUBLIC_URL}/streamlit"
 echo ""
 echo "Nhan Ctrl+C de dung API, Streamlit va ngrok."
 
-wait "$NGROK_PID"
+wait "$API_PID"
