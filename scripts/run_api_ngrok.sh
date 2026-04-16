@@ -138,32 +138,57 @@ payload = json.loads(sys.argv[1])
 ngrok_domain = sys.argv[2].strip()
 api_port = sys.argv[3].strip()
 streamlit_port = sys.argv[4].strip()
-result = {}
-for item in payload.get("tunnels", []):
+tunnels = payload.get("tunnels", [])
+https_urls = []
+api_public_url = ""
+streamlit_public_url = ""
+
+for item in tunnels:
+    public_url = str(item.get("public_url", "")).strip()
+    if public_url.startswith("https://") and public_url not in https_urls:
+        https_urls.append(public_url)
+
+for item in tunnels:
     name = str(item.get("name", "")).strip()
     public_url = str(item.get("public_url", "")).strip()
     forwards_to = str(item.get("forwards_to", "")).strip()
     config = item.get("config", {}) or {}
     addr = str(config.get("addr", "")).strip()
 
-    is_api = False
-    is_streamlit = False
+    if not public_url:
+        continue
 
-    if ngrok_domain and ngrok_domain in public_url:
-        is_api = True
-    if name == "api":
-        is_api = True
-    if name == "streamlit":
-        is_streamlit = True
-    if api_port and (addr.endswith(f":{api_port}") or forwards_to.endswith(f":{api_port}")):
-        is_api = True
-    if streamlit_port and (addr.endswith(f":{streamlit_port}") or forwards_to.endswith(f":{streamlit_port}")):
-        is_streamlit = True
+    if not api_public_url:
+        if ngrok_domain and ngrok_domain in public_url:
+            api_public_url = public_url
+        elif name == "api":
+            api_public_url = public_url
+        elif api_port and (addr.endswith(f":{api_port}") or forwards_to.endswith(f":{api_port}")):
+            api_public_url = public_url
 
-    if is_api and public_url:
-        result["api_public_url"] = public_url
-    if is_streamlit and public_url:
-        result["streamlit_public_url"] = public_url
+    if not streamlit_public_url:
+        if name == "streamlit":
+            streamlit_public_url = public_url
+        elif streamlit_port and (addr.endswith(f":{streamlit_port}") or forwards_to.endswith(f":{streamlit_port}")):
+            streamlit_public_url = public_url
+
+if not api_public_url and https_urls:
+    api_public_url = https_urls[0]
+
+if not streamlit_public_url:
+    for url in https_urls:
+        if url != api_public_url:
+            streamlit_public_url = url
+            break
+
+if streamlit_public_url == api_public_url:
+    streamlit_public_url = ""
+
+result = {
+    "api_public_url": api_public_url,
+    "streamlit_public_url": streamlit_public_url,
+    "https_urls": https_urls,
+}
 print(json.dumps(result, ensure_ascii=False))
 PY
 }
@@ -204,6 +229,8 @@ fi
 if [[ -z "$STREAMLIT_PUBLIC_URL_RUNTIME" ]]; then
   echo "Khong lay duoc public URL cua Streamlit tu ngrok."
   echo "Tunnel data: $URLS_JSON"
+  echo "Raw tunnels:"
+  curl -fsS "http://127.0.0.1:4040/api/tunnels" || true
   cat "${NGROK_WORKDIR}/ngrok.log"
   exit 1
 fi
