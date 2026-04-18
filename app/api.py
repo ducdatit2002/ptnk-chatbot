@@ -32,7 +32,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=list(settings.api_allowed_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -49,6 +49,20 @@ def _load_runtime_urls() -> dict[str, str]:
     if not isinstance(payload, dict):
         return {}
     return {str(key): str(value) for key, value in payload.items() if value}
+
+
+@app.get("/")
+def root() -> dict[str, object]:
+    return {
+        "name": app.title,
+        "version": app.version,
+        "docs_url": "/docs",
+        "health_url": "/health",
+        "chat_url": "/chat",
+        "ingest_url": "/ingest",
+        "history_url_template": "/sessions/{session_id}/history",
+        "cors_allowed_origins": list(settings.api_allowed_origins),
+    }
 
 
 @app.get("/health", response_model=HealthResponse)

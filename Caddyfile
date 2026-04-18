@@ -1,0 +1,4 @@
+chatbot-backend-ptnk.aiotlab.io.vn {
+    encode zstd gzip
+    reverse_proxy backend:8000
+}

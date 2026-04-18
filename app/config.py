@@ -72,6 +72,7 @@ class Settings:
     fast_answer_max_chars: int
     api_host: str
     api_port: int
+    api_allowed_origins: tuple[str, ...]
     public_base_url: str
     ngrok_authtoken: str
     ngrok_domain: str
@@ -106,7 +107,7 @@ def get_settings() -> Settings:
             os.getenv("RUNTIME_URLS_PATH", str(project_root / "storage" / "runtime_urls.json"))
         ).expanduser(),
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
-        openai_chat_model=os.getenv("OPENAI_CHAT_MODEL", "gpt-5.2").strip(),
+        openai_chat_model=os.getenv("OPENAI_CHAT_MODEL", "gpt-4o").strip(),
         openai_embedding_model=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small").strip(),
         pinecone_api_key=(
             os.getenv("PINECONE_API_KEY", "").strip()
@@ -126,7 +127,7 @@ def get_settings() -> Settings:
         openai_timeout_seconds=_float_env("OPENAI_TIMEOUT_SECONDS", 60.0),
         api_base_url=os.getenv("API_BASE_URL", "http://localhost:8000").strip(),
         enable_web_search_fallback=_bool_env("ENABLE_WEB_SEARCH_FALLBACK", True),
-        openai_web_search_model=os.getenv("OPENAI_WEB_SEARCH_MODEL", "gpt-5").strip(),
+        openai_web_search_model=os.getenv("OPENAI_WEB_SEARCH_MODEL", "gpt-4o").strip(),
         web_search_allowed_domains=_csv_env(
             "WEB_SEARCH_ALLOWED_DOMAINS",
             ("ptnk.edu.vn", "vnuhcm.edu.vn", "facebook.com"),
@@ -137,6 +138,7 @@ def get_settings() -> Settings:
         fast_answer_max_chars=_int_env("FAST_ANSWER_MAX_CHARS", 420),
         api_host=os.getenv("API_HOST", "127.0.0.1").strip(),
         api_port=_int_env("API_PORT", 8000),
+        api_allowed_origins=_csv_env("API_ALLOWED_ORIGINS", ("*",)),
         public_base_url=(
             os.getenv("PUBLIC_BASE_URL", "").strip()
             or (

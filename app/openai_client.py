@@ -22,6 +22,13 @@ class OpenAIRAGClient:
         )
         self._query_embedding_cache: OrderedDict[str, list[float]] = OrderedDict()
 
+    def _responses_kwargs(self, *, model: str) -> dict:
+        kwargs: dict = {"model": model}
+        normalized = model.strip().lower()
+        if normalized.startswith("gpt-5"):
+            kwargs["reasoning"] = {"effort": "low"}
+        return kwargs
+
     def embed_texts(self, texts: Iterable[str]) -> list[list[float]]:
         clean_texts = [text.strip() for text in texts if text and text.strip()]
         if not clean_texts:
@@ -98,8 +105,7 @@ class OpenAIRAGClient:
         )
 
         response = self.client.responses.create(
-            model=self.settings.openai_chat_model,
-            reasoning={"effort": "low"},
+            **self._responses_kwargs(model=self.settings.openai_chat_model),
             instructions=instructions,
             input=prompt,
             max_output_tokens=350,
@@ -115,8 +121,7 @@ class OpenAIRAGClient:
     ) -> WebSearchResult:
         search_query = self._build_ptnk_search_query(question, history)
         initial_response = self.client.responses.create(
-            model=self.settings.openai_web_search_model,
-            reasoning={"effort": "low"},
+            **self._responses_kwargs(model=self.settings.openai_web_search_model),
             tools=[self._build_web_search_tool()],
             tool_choice="auto",
             include=["web_search_call.action.sources"],
@@ -150,8 +155,7 @@ class OpenAIRAGClient:
             )
 
         verified_response = self.client.responses.create(
-            model=self.settings.openai_web_search_model,
-            reasoning={"effort": "low"},
+            **self._responses_kwargs(model=self.settings.openai_web_search_model),
             tools=[self._build_web_search_tool()],
             tool_choice="auto",
             include=["web_search_call.action.sources"],

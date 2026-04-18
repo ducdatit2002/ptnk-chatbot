@@ -5,6 +5,7 @@ Chatbot RAG mẫu cho bài toán hỏi đáp tuyển sinh của Trường Phổ 
 Project này gồm:
 
 - API bằng FastAPI để tích hợp với Messenger hoặc các kênh khác.
+- Frontend chatbot bằng Next.js trong thư mục `client/`.
 - App Streamlit để test chatbot nhanh.
 - Pipeline ingest dữ liệu từ thư mục `data/`.
 - Vector store dùng Pinecone.
@@ -32,6 +33,11 @@ Lưu ý: file `data/sample_admissions_2026.json` là dữ liệu demo để test
 │   ├── schemas.py
 │   ├── streamlit_app.py
 │   └── types.py
+├── client/
+│   ├── app/
+│   ├── components/
+│   ├── lib/
+│   └── package.json
 ├── data/
 │   └── sample_admissions_2026.json
 ├── storage/
@@ -78,7 +84,7 @@ PINECONE_NAMESPACE=admissions-demo
 PINECONE_CLOUD=aws
 PINECONE_REGION=us-east-1
 
-OPENAI_CHAT_MODEL=gpt-5.2
+OPENAI_CHAT_MODEL=gpt-4o
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 
 CHAT_HISTORY_DB_PATH=storage/chat_history.db
@@ -90,7 +96,7 @@ HISTORY_CONTEXT_MESSAGES=12
 API_BASE_URL=http://localhost:8000
 
 ENABLE_WEB_SEARCH_FALLBACK=true
-OPENAI_WEB_SEARCH_MODEL=gpt-5
+OPENAI_WEB_SEARCH_MODEL=gpt-4o
 WEB_SEARCH_ALLOWED_DOMAINS=ptnk.edu.vn,vnuhcm.edu.vn,facebook.com
 WEB_SEARCH_SCORE_THRESHOLD=0.35
 QUERY_EMBEDDING_CACHE_SIZE=512
@@ -98,6 +104,7 @@ FAST_ANSWER_SCORE_THRESHOLD=0.72
 FAST_ANSWER_MAX_CHARS=420
 API_HOST=127.0.0.1
 API_PORT=8000
+API_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173
 NGROK_DOMAIN=film-stranger-algorithm.ngrok-free.dev
 PUBLIC_BASE_URL=https://film-stranger-algorithm.ngrok-free.dev
 STREAMLIT_LOCAL_URL=http://127.0.0.1:8501
@@ -118,6 +125,7 @@ RUNTIME_URLS_PATH=storage/runtime_urls.json
 - `FAST_ANSWER_MAX_CHARS`: giới hạn độ dài cho fast path để câu trả lời vẫn ngắn và gọn.
 - `NGROK_DOMAIN`: domain ngrok co dinh de public API.
 - `PUBLIC_BASE_URL`: public URL de dung cho Messenger webhook hoac test tu ben ngoai.
+- `API_ALLOWED_ORIGINS`: danh sach frontend duoc phep goi API, cach nhau boi dau phay. Neu de `*` thi mo cho tat ca.
 - `STREAMLIT_LOCAL_URL`: link Streamlit local.
 - `STREAMLIT_PUBLIC_URL`: link Streamlit public neu ban co public rieng.
 - `STREAMLIT_HOST`, `STREAMLIT_PORT`: host/port chay Streamlit local.
@@ -164,6 +172,12 @@ Giới hạn an toàn:
 uvicorn app.api:app --reload
 ```
 
+Hoac dung script de tu tao `.venv`, cai dependency va chay API:
+
+```bash
+bash scripts/run_api.sh
+```
+
 API mặc định chạy tại:
 
 ```text
@@ -174,6 +188,12 @@ Swagger UI:
 
 ```text
 http://localhost:8000/docs
+```
+
+Route goc de frontend hoac dev kiem tra nhanh:
+
+```text
+http://localhost:8000/
 ```
 
 ## 6.1. Chạy API kèm ngrok
@@ -209,6 +229,33 @@ https://film-stranger-algorithm.ngrok-free.dev/streamlit
 ```
 
 Route nay se redirect sang public URL cua Streamlit do script ngrok tao ra.
+
+## 6.2. Frontend Next.js
+
+Frontend chatbot da duoc tao trong thu muc `client/` de ban test local truoc, sau do deploy rieng len Netlify.
+
+Tao file `client/.env.local`:
+
+```env
+BACKEND_API_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_APP_NAME=PTNK Admissions Assistant
+```
+
+Chay frontend:
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+Frontend mac dinh chay tai:
+
+```text
+http://localhost:3000
+```
+
+Frontend se goi route noi bo `/api/chat`, va route nay se proxy sang backend tai `BACKEND_API_URL`.
 
 ## 7. Ingest dữ liệu vào Pinecone
 
