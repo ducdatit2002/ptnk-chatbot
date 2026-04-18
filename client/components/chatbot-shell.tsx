@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { ChatMessage } from "@/components/chat-message";
@@ -175,9 +176,19 @@ export function ChatbotShell() {
 
       <section className="chat-panel">
         <header className="chat-header">
-          <div>
+          <div className="brand-block">
+            <Image
+              src="/logo-ptnk.png"
+              alt="Logo Trường Phổ thông Năng khiếu"
+              width={56}
+              height={56}
+              className="brand-logo"
+              priority
+            />
+            <div>
             <p className="eyebrow">Trò chuyện cùng chatbot</p>
             <h2>{APP_NAME}</h2>
+            </div>
           </div>
           <span className={`status-dot status-${backendStatus}`} aria-label={`backend-${backendStatus}`} />
           <button className="ghost-button" type="button" onClick={handleReset}>

@@ -2,8 +2,12 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PTNK Admissions Assistant",
-  description: "Chatbot hoi dap than thien cho hoc sinh lop 9 va phu huynh ve truong Pho thong Nang khieu.",
+  title: "Chatbot Trường Phổ thông Năng khiếu - ĐHQG-HCM",
+  description: "Chatbot hỏi đáp thân thiện cho học sinh lớp 9 và phụ huynh về Trường Phổ thông Năng khiếu - ĐHQG-HCM.",
+  icons: {
+    icon: "/logo-ptnk.png",
+    apple: "/logo-ptnk.png",
+  },
 };
 
 export const viewport: Viewport = {
